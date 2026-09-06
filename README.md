@@ -18,9 +18,9 @@ Next.js 15 (App Router) · TypeScript · Prisma · PostgreSQL · Auth.js v5 (cre
 
 1. `npm install`
 2. Copy `.env.example` to `.env` and fill it in:
-   - `DATABASE_URL` — the **pooled** Neon connection (host contains `-pooler`). Used at runtime.
-   - `DIRECT_URL` — the **direct** Neon connection (same URL without `-pooler`). Used by Prisma
-     Migrate; DDL and advisory locks don't work through the pooler.
+   - `DATABASE_URL` — the **pooled** Neon connection (host contains `-pooler`). The only database
+     variable the app needs, locally and on Vercel. Prisma Migrate runs fine through the pooler
+     for this project.
    - `AUTH_SECRET` — run `npx auth secret` or `openssl rand -base64 33`.
    - `OFFICE_TZ` — the office's IANA timezone (all form times are read/shown in this zone).
    - `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NAME` — the first admin account.
@@ -53,7 +53,7 @@ The timezone helpers have an offline check: `npx tsx scripts/tz-check.mts`.
 2. In the Vercel project, connect the existing Neon **faro-schedule** database (Storage tab →
    Neon → connect existing), or add the env vars by hand.
 3. Set these env vars for Production (and Preview) — the same values as your local `.env`:
-   `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `OFFICE_TZ`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+   `DATABASE_URL`, `AUTH_SECRET`, `OFFICE_TZ`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
    `ADMIN_NAME`.
 4. Set the **Build Command** to `prisma migrate deploy && prisma generate && next build` so each
    deploy applies pending migrations. (The DB is already migrated + seeded, so the first deploy is
