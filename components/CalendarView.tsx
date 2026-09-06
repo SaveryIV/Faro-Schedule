@@ -46,7 +46,8 @@ type Dialog =
       end: Date;
       spaceName: string;
       bookedBy: string;
-      canEdit: boolean;
+      mine: boolean;
+      canDelete: boolean;
     };
 
 export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
@@ -121,7 +122,8 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
       end: e.end,
       spaceName: e.extendedProps.spaceName,
       bookedBy: e.extendedProps.bookedBy,
-      canEdit: Boolean(e.extendedProps.canEdit),
+      mine: Boolean(e.extendedProps.mine),
+      canDelete: Boolean(e.extendedProps.canDelete),
     });
   }, []);
 
@@ -143,12 +145,28 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
   );
 
   const renderEvent = useCallback((arg: EventContentArg) => {
+    const isMonth = arg.view.type === "dayGridMonth";
+    if (isMonth) {
+      return (
+        <div className="flex items-center gap-1 overflow-hidden px-1">
+          <span
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ background: arg.event.backgroundColor }}
+          />
+          <span className="truncate text-[11px]">
+            {arg.timeText} {arg.event.title}
+          </span>
+        </div>
+      );
+    }
     return (
-      <div className="overflow-hidden px-1 py-0.5 leading-tight">
-        <div className="text-[11px] font-semibold opacity-90">{arg.timeText}</div>
-        <div className="truncate text-[12px] font-medium">{arg.event.title}</div>
+      <div className="flex h-full flex-col gap-px overflow-hidden px-1.5 py-0.5 leading-tight">
+        <div className="truncate text-[9px] font-semibold uppercase tracking-wide opacity-70">
+          {arg.event.extendedProps.spaceName}
+        </div>
+        <div className="truncate text-[12px] font-semibold">{arg.event.title}</div>
         <div className="truncate text-[10px] opacity-80">
-          {arg.event.extendedProps.spaceName} · {arg.event.extendedProps.bookedBy}
+          {arg.timeText} · {arg.event.extendedProps.bookedBy}
         </div>
       </div>
     );
@@ -177,8 +195,8 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
             {s.name}
           </button>
         ))}
-        <span className="ml-auto text-xs text-neutral-500">
-          Drag to book · click a booking to manage it
+        <span className="ml-auto hidden text-xs text-neutral-500 sm:inline">
+          Drag an empty slot to book · pick one room or Day view for a clearer look
         </span>
       </div>
 
@@ -208,12 +226,15 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
             firstDay={1}
             nowIndicator
             allDaySlot={false}
-            slotMinTime="06:00:00"
-            slotMaxTime="22:00:00"
+            slotMinTime="07:00:00"
+            slotMaxTime="21:00:00"
             scrollTime="08:00:00"
+            slotDuration="00:30:00"
+            snapDuration="00:15:00"
             expandRows
             height="auto"
             stickyHeaderDates
+            dayMaxEvents={3}
             selectable
             selectMirror
             selectMinDistance={2}
@@ -221,6 +242,9 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
             editable
             eventResizableFromStart
             eventDurationEditable
+            slotEventOverlap={false}
+            eventMinHeight={30}
+            eventShortHeight={44}
             slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             events={fetchEvents}
@@ -482,7 +506,16 @@ function EventDialog({
           <dd>{dialog.bookedBy}</dd>
         </div>
       </dl>
-      {dialog.canEdit && (
+
+      {!dialog.mine && (
+        <p className="mt-4 rounded-md bg-neutral-50 px-3 py-2 text-xs text-neutral-500 dark:bg-neutral-800/60">
+          {dialog.canDelete
+            ? "Someone else booked this. As an admin you can cancel it, but only they can move it."
+            : "Someone else booked this. Only they can change or cancel it."}
+        </p>
+      )}
+
+      {dialog.canDelete && (
         <div className="mt-5 flex justify-end">
           <button
             type="button"

@@ -172,8 +172,8 @@ export async function moveBooking(input: {
     include: { space: { select: { name: true } } },
   });
   if (!appointment) return { error: "That booking no longer exists." };
-  if (appointment.userId !== user.id && !isAdmin(user.role)) {
-    return { error: "You can only move your own bookings." };
+  if (appointment.userId !== user.id) {
+    return { error: "Only the person who booked it can move it." };
   }
 
   try {

@@ -37,10 +37,14 @@ export async function GET(req: NextRequest) {
     orderBy: { startsAt: "asc" },
   });
 
-  const canEditAll = isAdmin(user.role);
+  const admin = isAdmin(user.role);
 
   const events = appointments.map((a) => {
-    const editable = canEditAll || a.userId === user.id;
+    const mine = a.userId === user.id;
+    // Only the creator may reschedule (drag/resize). Deleting is allowed for
+    // the creator and for admins.
+    const canMove = mine;
+    const canDelete = mine || admin;
     const color = SPACE_COLOR[a.space.slug] ?? DEFAULT_COLOR;
     return {
       id: a.id,
@@ -49,13 +53,14 @@ export async function GET(req: NextRequest) {
       end: a.endsAt.toISOString(),
       backgroundColor: color,
       borderColor: color,
-      editable,
+      editable: canMove,
       extendedProps: {
         spaceName: a.space.name,
         spaceSlug: a.space.slug,
         bookedBy: a.user.name,
-        mine: a.userId === user.id,
-        canEdit: editable,
+        mine,
+        canMove,
+        canDelete,
       },
     };
   });

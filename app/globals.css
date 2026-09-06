@@ -51,19 +51,45 @@ body {
   font-weight: 500;
 }
 
+/* Taller rows so side-by-side bookings stay readable. */
+.fc-faro .fc-timegrid-slot {
+  height: 2.3em;
+}
+
 .fc-faro .fc-event {
-  border-radius: 6px;
-  border-width: 0 0 0 3px;
+  border-radius: 7px;
+  border: none;
   padding: 0;
   cursor: pointer;
+  box-shadow: inset 3px 0 0 rgba(0, 0, 0, 0.28);
+}
+
+/* A visible gutter between concurrent bookings (different spaces, same time). */
+.fc-faro .fc-timegrid-event-harness {
+  margin-right: 3px;
+}
+
+.fc-faro .fc-timegrid-event {
+  box-shadow: none;
 }
 
 .fc-faro .fc-event-main {
   color: #fff;
 }
 
+.fc-faro .fc-daygrid-event {
+  background: transparent !important;
+  border: none;
+  box-shadow: none;
+  color: inherit;
+}
+
 .fc-faro .fc-timegrid-now-indicator-arrow {
   display: none;
+}
+
+.fc-faro .fc-highlight {
+  background: color-mix(in oklab, var(--color-sky-500) 18%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {
