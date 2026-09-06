@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
-import { requireApprovedUser } from "@/lib/auth-guard";
+import { requireApprovedUser, isAdmin } from "@/lib/auth-guard";
 import { createAppointmentSchema } from "@/lib/validation";
 import { officeLocalToUtc } from "@/lib/tz";
 
@@ -94,7 +94,7 @@ export async function deleteAppointment(formData: FormData) {
   const appointment = await prisma.appointment.findUnique({ where: { id } });
   if (!appointment) return;
 
-  const canDelete = appointment.userId === user.id || user.role === "ADMIN";
+  const canDelete = appointment.userId === user.id || isAdmin(user.role);
   if (!canDelete) return;
 
   await prisma.appointment.delete({ where: { id } });

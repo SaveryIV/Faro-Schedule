@@ -62,7 +62,8 @@ export default async function AppointmentsPage({
               </h2>
               <ul className="divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
                 {items.map((a) => {
-                  const canDelete = a.userId === user.id || user.role === "ADMIN";
+                  const canDelete =
+                    a.userId === user.id || user.role !== "USER";
                   return (
                     <li
                       key={a.id}

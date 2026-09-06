@@ -26,7 +26,7 @@ export function NavBar({ user }: { user: CurrentUser }) {
               {l.label}
             </Link>
           ))}
-          {user.role === "ADMIN" && (
+          {user.role !== "USER" && (
             <Link
               href="/admin/users"
               className="rounded-md px-2.5 py-1.5 text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white"

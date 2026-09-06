@@ -44,9 +44,21 @@ export async function requireApprovedUser(): Promise<CurrentUser> {
   return user;
 }
 
-/** Approved AND an admin. */
+/** True for ADMIN and SUPER_ADMIN. */
+export function isAdmin(role: Role): boolean {
+  return role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
+/** Approved AND at least an admin (ADMIN or SUPER_ADMIN). */
 export async function requireAdmin(): Promise<CurrentUser> {
   const user = await requireApprovedUser();
-  if (user.role !== "ADMIN") redirect("/calendar");
+  if (!isAdmin(user.role)) redirect("/calendar");
+  return user;
+}
+
+/** Approved AND the super admin. Gate for role management. */
+export async function requireSuperAdmin(): Promise<CurrentUser> {
+  const user = await requireApprovedUser();
+  if (user.role !== "SUPER_ADMIN") redirect("/calendar");
   return user;
 }

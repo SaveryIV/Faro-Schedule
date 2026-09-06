@@ -32,10 +32,18 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 12);
   await prisma.user.upsert({
     where: { email },
-    update: { role: "ADMIN", status: "APPROVED", name },
-    create: { email, name, passwordHash, role: "ADMIN", status: "APPROVED" },
+    // Re-seeding re-asserts the super admin and rotates the password to the
+    // current ADMIN_PASSWORD, so this account can never be locked out.
+    update: { role: "SUPER_ADMIN", status: "APPROVED", name, passwordHash },
+    create: {
+      email,
+      name,
+      passwordHash,
+      role: "SUPER_ADMIN",
+      status: "APPROVED",
+    },
   });
-  console.log(`Admin ready: ${email}`);
+  console.log(`Super admin ready: ${email}`);
 }
 
 main()
