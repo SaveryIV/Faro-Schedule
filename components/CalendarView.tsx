@@ -226,9 +226,9 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
             firstDay={1}
             nowIndicator
             allDaySlot={false}
-            slotMinTime="07:00:00"
-            slotMaxTime="21:00:00"
-            scrollTime="08:00:00"
+            slotMinTime="06:00:00"
+            slotMaxTime="22:00:00"
+            scrollTime="07:30:00"
             slotDuration="00:30:00"
             snapDuration="00:15:00"
             expandRows

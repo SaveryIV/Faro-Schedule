@@ -51,9 +51,10 @@ body {
   font-weight: 500;
 }
 
-/* Taller rows so side-by-side bookings stay readable. */
+/* Row height — keeps side-by-side bookings readable without making the
+   06:00–22:00 day absurdly tall. */
 .fc-faro .fc-timegrid-slot {
-  height: 2.3em;
+  height: 2em;
 }
 
 .fc-faro .fc-event {

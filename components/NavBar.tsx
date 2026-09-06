@@ -12,7 +12,7 @@ const links = [
 export function NavBar({ user }: { user: CurrentUser }) {
   return (
     <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+      <div className="mx-auto flex max-w-[92rem] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link href="/calendar" className="text-sm font-semibold tracking-tight">
           Faro Schedule
         </Link>

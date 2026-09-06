@@ -44,7 +44,7 @@ export default async function AdminUsersPage() {
   users.sort((a, b) => order[a.status] - order[b.status]);
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-5xl space-y-5">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Users</h1>
         <p className="text-sm text-neutral-500">
