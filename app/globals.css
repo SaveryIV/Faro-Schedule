@@ -13,3 +13,70 @@ body {
     @apply bg-neutral-950 text-neutral-100;
   }
 }
+
+/* ---- FullCalendar theming ------------------------------------------------ */
+.fc-faro {
+  --fc-border-color: var(--color-neutral-200);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--color-neutral-50);
+  --fc-today-bg-color: var(--color-amber-50);
+  --fc-now-indicator-color: var(--color-red-500);
+  --fc-button-bg-color: var(--color-neutral-900);
+  --fc-button-border-color: var(--color-neutral-900);
+  --fc-button-hover-bg-color: var(--color-neutral-700);
+  --fc-button-hover-border-color: var(--color-neutral-700);
+  --fc-button-active-bg-color: var(--color-neutral-600);
+  --fc-button-active-border-color: var(--color-neutral-600);
+  --fc-button-text-color: #fff;
+  font-size: 0.875rem;
+}
+
+.fc-faro .fc-toolbar-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.fc-faro .fc-button {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  box-shadow: none !important;
+}
+
+.fc-faro .fc-col-header-cell-cushion,
+.fc-faro .fc-timegrid-axis-cushion,
+.fc-faro .fc-daygrid-day-number {
+  color: var(--color-neutral-500);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.fc-faro .fc-event {
+  border-radius: 6px;
+  border-width: 0 0 0 3px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.fc-faro .fc-event-main {
+  color: #fff;
+}
+
+.fc-faro .fc-timegrid-now-indicator-arrow {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .fc-faro {
+    --fc-border-color: var(--color-neutral-800);
+    --fc-neutral-bg-color: var(--color-neutral-900);
+    --fc-today-bg-color: color-mix(in oklab, var(--color-amber-500) 12%, transparent);
+    --fc-button-bg-color: var(--color-neutral-100);
+    --fc-button-border-color: var(--color-neutral-100);
+    --fc-button-hover-bg-color: var(--color-neutral-300);
+    --fc-button-hover-border-color: var(--color-neutral-300);
+    --fc-button-active-bg-color: var(--color-neutral-400);
+    --fc-button-active-border-color: var(--color-neutral-400);
+    --fc-button-text-color: var(--color-neutral-900);
+  }
+}

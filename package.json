@@ -15,6 +15,11 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@fullcalendar/core": "6.1.19",
+    "@fullcalendar/daygrid": "6.1.19",
+    "@fullcalendar/interaction": "6.1.19",
+    "@fullcalendar/react": "6.1.19",
+    "@fullcalendar/timegrid": "6.1.19",
     "@prisma/client": "^6.16.1",
     "bcryptjs": "^3.0.2",
     "date-fns": "^4.1.0",

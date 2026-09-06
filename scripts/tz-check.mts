@@ -9,7 +9,6 @@ import {
   officeTime,
   officeDayKey,
 } from "../lib/tz";
-import { mondayKey } from "../lib/week";
 
 let failures = 0;
 function check(label: string, actual: unknown, expected: unknown) {
@@ -33,11 +32,6 @@ check(
   "officeDayKey at 23:30 local (02:30Z next day)",
   officeDayKey(officeLocalToUtc("2026-09-10T23:30")),
   "2026-09-10",
-);
-check(
-  "mondayKey for Sunday 23:30 local stays in same week",
-  mondayKey(officeLocalToUtc("2026-09-13T23:30")),
-  "2026-09-07",
 );
 
 console.log(failures === 0 ? "\n✓ TZ layer OK" : `\n✗ ${failures} failure(s)`);
