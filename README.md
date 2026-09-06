@@ -71,11 +71,20 @@ express these.
 - When you create a new migration that touches `Appointment`, re-check that these constraints
   survive.
 
+## Roles
+
+| Role | Can do |
+|---|---|
+| **USER** | See all bookings; create bookings; cancel their own. |
+| **ADMIN** | Everything a USER can, plus: approve/reject pending sign-ups, cancel anyone's booking. Cannot change roles or act on other ADMIN/SUPER_ADMIN accounts. |
+| **SUPER_ADMIN** | Everything. The only role that can grant/revoke ADMIN (and SUPER_ADMIN). Cannot change its own role; `npm run db:seed` re-asserts the `ADMIN_EMAIL` account as SUPER_ADMIN every run, so it can never be locked out. |
+
 ## How access control works
 
 - `middleware.ts` only does a coarse "is the user logged in?" check for page navigation.
-- The real gate is `lib/auth-guard.ts` (`requireApprovedUser`, `requireAdmin`), which reloads the
-  user from the database on every call so approvals/role changes take effect immediately.
+- The real gate is `lib/auth-guard.ts` (`requireApprovedUser`, `requireAdmin`, `requireSuperAdmin`),
+  which reloads the user from the database on every call so approvals/role changes take effect
+  immediately.
 - **Every server action calls one of these guards on its first line** — server actions are not
   covered by middleware.
 
