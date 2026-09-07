@@ -5,6 +5,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
+import esLocale from "@fullcalendar/core/locales/es";
 import type {
   EventClickArg,
   EventChangeArg,
@@ -202,7 +203,7 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
           api.refetchEvents();
         } else if (sig !== known) {
           api.refetchEvents();
-          setToast({ text: "Calendar updated", kind: "info" });
+          setToast({ text: "Calendario actualizado", kind: "info" });
         }
       } catch {
         // A dropped poll is harmless — the next one catches up.
@@ -314,9 +315,9 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
   return (
     <div className="space-y-4">
       <div className="hidden items-center justify-between gap-3 sm:flex">
-        <h1 className="text-xl font-bold tracking-tight">Calendar</h1>
+        <h1 className="text-xl font-bold tracking-tight">Calendario</h1>
         <p className="hidden text-xs text-stone-500 lg:block">
-          Click a slot to book, or a booking to change its time
+          Tocá un espacio libre para reservar, o una reserva para cambiar el horario
         </p>
       </div>
 
@@ -326,7 +327,7 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
           onClick={() => selectSpace("")}
           className={chipClass(activeSpace === "")}
         >
-          All spaces
+          Todos los espacios
         </button>
         {spaces.map((s) => (
           <button
@@ -362,6 +363,7 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
           <FullCalendar
             ref={calendarRef}
             plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
+            locale={esLocale}
             initialView={
               typeof window !== "undefined" &&
               window.matchMedia(MOBILE_QUERY).matches
@@ -389,10 +391,10 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
                 : { month: "short", day: "numeric", year: "numeric" }
             }
             buttonText={{
-              today: "Today",
-              week: "Week",
-              day: "Day",
-              month: "Month",
+              today: "Hoy",
+              week: "Semana",
+              day: "Día",
+              month: "Mes",
             }}
             firstDay={1}
             nowIndicator
@@ -532,7 +534,7 @@ function Modal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label="Cerrar"
             className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800"
           >
             <CloseIcon />
@@ -612,11 +614,11 @@ function BookingDialog({
   }
 
   return (
-    <Modal title="New booking" onClose={onClose}>
+    <Modal title="Nueva reserva" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         {error && <p className={errorBox}>{error}</p>}
         <label className="block space-y-1.5">
-          <span className={fieldLabel}>Space</span>
+          <span className={fieldLabel}>Espacio</span>
           <select
             value={spaceId}
             onChange={(e) => setSpaceId(e.target.value)}
@@ -630,20 +632,20 @@ function BookingDialog({
           </select>
         </label>
         <label className="block space-y-1.5">
-          <span className={fieldLabel}>Title</span>
+          <span className={fieldLabel}>Título</span>
           <input
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
             maxLength={120}
-            placeholder="What is the room for?"
+            placeholder="¿Para qué es la sala?"
             className={inputClass}
           />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block space-y-1.5">
-            <span className={fieldLabel}>Start</span>
+            <span className={fieldLabel}>Inicio</span>
             <input
               type="datetime-local"
               step={60}
@@ -654,7 +656,7 @@ function BookingDialog({
             />
           </label>
           <label className="block space-y-1.5">
-            <span className={fieldLabel}>End</span>
+            <span className={fieldLabel}>Fin</span>
             <input
               type="datetime-local"
               step={60}
@@ -667,10 +669,10 @@ function BookingDialog({
         </div>
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className={secondaryButton}>
-            Cancel
+            Cancelar
           </button>
           <button type="submit" disabled={pending} className={primaryButton}>
-            {pending ? "Saving…" : "Create booking"}
+            {pending ? "Guardando…" : "Crear reserva"}
           </button>
         </div>
       </form>
@@ -732,13 +734,13 @@ function EventDialog({
   return (
     <Modal title={dialog.title} onClose={onClose}>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-        <dt className="text-stone-500">Space</dt>
+        <dt className="text-stone-500">Espacio</dt>
         <dd className="font-medium">{dialog.spaceName}</dd>
-        <dt className="text-stone-500">When</dt>
+        <dt className="text-stone-500">Cuándo</dt>
         <dd>
           {formatOffice(dialog.start)} – {formatOffice(dialog.end)}
         </dd>
-        <dt className="text-stone-500">Booked by</dt>
+        <dt className="text-stone-500">Reservado por</dt>
         <dd>{dialog.bookedBy}</dd>
       </dl>
 
@@ -750,7 +752,7 @@ function EventDialog({
           {timeError && <p className={errorBox}>{timeError}</p>}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1.5">
-              <span className={fieldLabel}>Start</span>
+              <span className={fieldLabel}>Inicio</span>
               <input
                 type="datetime-local"
                 step={60}
@@ -761,7 +763,7 @@ function EventDialog({
               />
             </label>
             <label className="block space-y-1.5">
-              <span className={fieldLabel}>End</span>
+              <span className={fieldLabel}>Fin</span>
               <input
                 type="datetime-local"
                 step={60}
@@ -773,7 +775,7 @@ function EventDialog({
             </label>
           </div>
           <button type="submit" disabled={savingTime} className={primaryButton}>
-            {savingTime ? "Saving…" : "Save time"}
+            {savingTime ? "Guardando…" : "Guardar horario"}
           </button>
         </form>
       )}
@@ -781,8 +783,8 @@ function EventDialog({
       {!dialog.mine && (
         <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500 dark:bg-stone-800/60">
           {dialog.canDelete
-            ? "Someone else booked this. As an admin you can cancel it, but only they can move it."
-            : "Someone else booked this. Only they can change or cancel it."}
+            ? "Otra persona hizo esta reserva. Como administrador podés cancelarla, pero solo esa persona puede moverla."
+            : "Otra persona hizo esta reserva. Solo esa persona puede cambiarla o cancelarla."}
         </p>
       )}
 
@@ -793,7 +795,7 @@ function EventDialog({
           disabled={pending}
           className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-800/70 dark:text-red-300 dark:hover:bg-red-950"
         >
-          {pending ? "Cancelling…" : "Cancel this booking"}
+          {pending ? "Cancelando…" : "Cancelar esta reserva"}
         </button>
       )}
     </Modal>

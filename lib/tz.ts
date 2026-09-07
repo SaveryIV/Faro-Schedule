@@ -1,4 +1,5 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { es } from "date-fns/locale";
 
 /**
  * Single office timezone. All booking form times are entered and displayed in
@@ -15,9 +16,12 @@ export function officeLocalToUtc(localValue: string): Date {
   return fromZonedTime(localValue, OFFICE_TZ);
 }
 
-/** Format a stored UTC Date for display in office-local time. */
-export function formatOffice(date: Date, fmt = "EEE d MMM yyyy, HH:mm"): string {
-  return formatInTimeZone(date, OFFICE_TZ, fmt);
+/** Format a stored UTC Date for display in office-local time (Spanish). */
+export function formatOffice(
+  date: Date,
+  fmt = "EEE d 'de' MMM yyyy, HH:mm",
+): string {
+  return formatInTimeZone(date, OFFICE_TZ, fmt, { locale: es });
 }
 
 /** "HH:mm" in office-local time. */

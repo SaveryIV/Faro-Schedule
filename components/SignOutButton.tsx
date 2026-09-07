@@ -10,7 +10,7 @@ export function SignOutButton({ className = "" }: { className?: string }) {
           className
         }
       >
-        Sign out
+        Cerrar sesión
       </button>
     </form>
   );

@@ -4,8 +4,8 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 const SPACES = [
-  { name: "Hall", slug: "hall" },
-  { name: "Meeting Room", slug: "meeting-room" },
+  { name: "Salón", slug: "hall" },
+  { name: "Sala de Reuniones", slug: "meeting-room" },
 ];
 
 async function main() {
@@ -20,7 +20,7 @@ async function main() {
 
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
-  const name = process.env.ADMIN_NAME?.trim() || "Office Admin";
+  const name = process.env.ADMIN_NAME?.trim() || "Administración";
 
   if (!email || !password) {
     console.warn(

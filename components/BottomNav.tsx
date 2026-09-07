@@ -42,9 +42,9 @@ export function BottomNav({ user }: { user: CurrentUser }) {
   const pathname = usePathname();
 
   const items = [
-    { href: "/calendar", label: "Calendar", Icon: CalendarIcon },
-    { href: "/appointments/new", label: "New booking", Icon: PlusIcon, primary: true },
-    { href: "/appointments", label: "Bookings", Icon: ListIcon },
+    { href: "/calendar", label: "Calendario", Icon: CalendarIcon },
+    { href: "/appointments/new", label: "Reservar", Icon: PlusIcon, primary: true },
+    { href: "/appointments", label: "Reservas", Icon: ListIcon },
     ...(user.role !== "USER"
       ? [{ href: "/admin/users", label: "Admin", Icon: ShieldIcon }]
       : []),

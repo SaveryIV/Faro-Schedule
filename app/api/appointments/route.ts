@@ -12,7 +12,7 @@ const DEFAULT_COLOR = "#475569";
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user || user.status !== "APPROVED") {
-    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const { searchParams } = req.nextUrl;

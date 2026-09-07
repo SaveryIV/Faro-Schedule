@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { formatOffice } from "@/lib/tz";
 import { approveUser, rejectUser, setUserRole } from "@/app/(app)/admin/actions";
 
-export const metadata: Metadata = { title: "Users · Faro Schedule" };
+export const metadata: Metadata = { title: "Usuarios · Faro Schedule" };
 
 const STATUS_STYLE: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
@@ -15,9 +15,9 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<UserStatus, string> = {
-  PENDING: "Pending",
-  APPROVED: "Approved",
-  REJECTED: "Rejected",
+  PENDING: "Pendiente",
+  APPROVED: "Aprobado",
+  REJECTED: "Rechazado",
 };
 
 const ROLE_STYLE: Record<Role, string> = {
@@ -28,9 +28,9 @@ const ROLE_STYLE: Record<Role, string> = {
 };
 
 const ROLE_LABEL: Record<Role, string> = {
-  USER: "User",
-  ADMIN: "Admin",
-  SUPER_ADMIN: "Super admin",
+  USER: "Usuario",
+  ADMIN: "Administrador",
+  SUPER_ADMIN: "Superadministrador",
 };
 
 /** Can `callerRole` approve/reject a user whose role is `targetRole`? */
@@ -75,7 +75,7 @@ function UserActions({
   if (self) {
     return (
       <span className="text-xs text-stone-400">
-        {u.role === "SUPER_ADMIN" ? "Super admin — you" : "You"}
+        {u.role === "SUPER_ADMIN" ? "Superadministrador — vos" : "Vos"}
       </span>
     );
   }
@@ -85,13 +85,13 @@ function UserActions({
       {actionable && u.status !== "APPROVED" && (
         <form action={approveUser}>
           <input type="hidden" name="id" value={u.id} />
-          <button className={approveBtn}>Approve</button>
+          <button className={approveBtn}>Aprobar</button>
         </form>
       )}
       {actionable && u.status !== "REJECTED" && (
         <form action={rejectUser}>
           <input type="hidden" name="id" value={u.id} />
-          <button className={rejectBtn}>Reject</button>
+          <button className={rejectBtn}>Rechazar</button>
         </form>
       )}
       {canManageRole &&
@@ -99,11 +99,11 @@ function UserActions({
           <form action={setUserRole} key={r}>
             <input type="hidden" name="id" value={u.id} />
             <input type="hidden" name="role" value={r} />
-            <button className={roleBtn}>Make {ROLE_LABEL[r].toLowerCase()}</button>
+            <button className={roleBtn}>Hacer {ROLE_LABEL[r].toLowerCase()}</button>
           </form>
         ))}
       {!actionable && !canManageRole && (
-        <span className="text-xs text-stone-400">No actions</span>
+        <span className="text-xs text-stone-400">Sin acciones</span>
       )}
     </div>
   );
@@ -131,11 +131,11 @@ export default async function AdminUsersPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
-        <h1 className="text-lg font-bold tracking-tight sm:text-xl">Users</h1>
+        <h1 className="text-lg font-bold tracking-tight sm:text-xl">Usuarios</h1>
         <p className="mt-1 text-sm text-stone-500">
-          Approve new coworkers so they can see and create bookings.
+          Aprobá a los nuevos compañeros para que puedan ver y crear reservas.
           {caller.role === "SUPER_ADMIN"
-            ? " As super admin, you can also grant or revoke admin rights."
+            ? " Como superadministrador, también podés otorgar o quitar permisos de administrador."
             : ""}
         </p>
       </div>
@@ -155,7 +155,7 @@ export default async function AdminUsersPage() {
                     {u.name}
                     {self && (
                       <span className="ml-1 text-xs font-normal text-stone-400">
-                        (you)
+                        (vos)
                       </span>
                     )}
                   </p>
@@ -184,12 +184,12 @@ export default async function AdminUsersPage() {
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-left text-xs font-semibold text-stone-500 dark:bg-stone-900">
             <tr>
-              <th className="px-4 py-2.5">Name</th>
-              <th className="px-4 py-2.5">Email</th>
-              <th className="px-4 py-2.5">Requested</th>
-              <th className="px-4 py-2.5">Status</th>
-              <th className="px-4 py-2.5">Role</th>
-              <th className="px-4 py-2.5">Actions</th>
+              <th className="px-4 py-2.5">Nombre</th>
+              <th className="px-4 py-2.5">Correo</th>
+              <th className="px-4 py-2.5">Solicitó</th>
+              <th className="px-4 py-2.5">Estado</th>
+              <th className="px-4 py-2.5">Rol</th>
+              <th className="px-4 py-2.5">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-200 dark:divide-stone-800">

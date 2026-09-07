@@ -7,9 +7,9 @@ import type { CurrentUser } from "@/lib/auth-guard";
 import { SignOutButton } from "@/components/SignOutButton";
 
 const baseLinks = [
-  { href: "/calendar", label: "Calendar" },
-  { href: "/appointments", label: "All bookings" },
-  { href: "/appointments/new", label: "New booking" },
+  { href: "/calendar", label: "Calendario" },
+  { href: "/appointments", label: "Reservas" },
+  { href: "/appointments/new", label: "Nueva reserva" },
 ];
 
 function useIsActive() {

@@ -33,7 +33,7 @@ export async function registerAction(
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    return { error: "An account with that email already exists." };
+    return { error: "Ya existe una cuenta con ese correo." };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -69,7 +69,7 @@ export async function loginAction(
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      return { error: "Wrong email or password, or your account was rejected." };
+      return { error: "Correo o contraseña incorrectos, o tu cuenta fue rechazada." };
     }
     throw err;
   }

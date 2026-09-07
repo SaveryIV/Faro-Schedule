@@ -45,15 +45,19 @@ export async function createAppointment(
   const endsAt = officeLocalToUtc(parsed.data.endsAtLocal);
 
   if (endsAt <= startsAt) {
-    return { fieldErrors: { endsAtLocal: ["End time must be after the start time"] } };
+    return {
+      fieldErrors: {
+        endsAtLocal: ["La hora de fin debe ser posterior a la de inicio"],
+      },
+    };
   }
   if (endsAt.getTime() < Date.now()) {
-    return { fieldErrors: { startsAtLocal: ["That time is already in the past"] } };
+    return { fieldErrors: { startsAtLocal: ["Esa hora ya pasó"] } };
   }
 
   const space = await prisma.space.findUnique({ where: { id: spaceId } });
   if (!space) {
-    return { fieldErrors: { spaceId: ["Choose a space"] } };
+    return { fieldErrors: { spaceId: ["Elegí un espacio"] } };
   }
 
   try {
@@ -77,7 +81,7 @@ export async function createAppointment(
   } catch (err) {
     if ((err instanceof Error && err.message === "OVERLAP") || isOverlapError(err)) {
       return {
-        error: `${space.name} is already booked for part of that time. Pick another slot.`,
+        error: `${space.name} ya está reservado en parte de ese horario. Elegí otro.`,
       };
     }
     throw err;
@@ -126,14 +130,14 @@ export async function createBooking(input: {
   const end = new Date(input.endISO);
   const title = input.title.trim();
 
-  if (Number.isNaN(+start) || Number.isNaN(+end)) return { error: "Invalid time." };
-  if (end <= start) return { error: "End time must be after the start time." };
-  if (end.getTime() < Date.now()) return { error: "That time is already in the past." };
-  if (title.length < 2) return { error: "Add a short title." };
-  if (title.length > 120) return { error: "Title is too long." };
+  if (Number.isNaN(+start) || Number.isNaN(+end)) return { error: "Hora inválida." };
+  if (end <= start) return { error: "La hora de fin debe ser posterior a la de inicio." };
+  if (end.getTime() < Date.now()) return { error: "Esa hora ya pasó." };
+  if (title.length < 2) return { error: "Agregá un título breve." };
+  if (title.length > 120) return { error: "El título es demasiado largo." };
 
   const space = await prisma.space.findUnique({ where: { id: input.spaceId } });
-  if (!space) return { error: "Choose a space." };
+  if (!space) return { error: "Elegí un espacio." };
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -144,7 +148,7 @@ export async function createBooking(input: {
     });
   } catch (err) {
     if ((err instanceof Error && err.message === "OVERLAP") || isOverlapError(err)) {
-      return { error: `${space.name} is already booked for part of that time.` };
+      return { error: `${space.name} ya está reservado en parte de ese horario.` };
     }
     throw err;
   }
@@ -171,9 +175,9 @@ export async function moveBooking(input: {
     where: { id: input.id },
     include: { space: { select: { name: true } } },
   });
-  if (!appointment) return { error: "That booking no longer exists." };
+  if (!appointment) return { error: "Esa reserva ya no existe." };
   if (appointment.userId !== user.id) {
-    return { error: "Only the person who booked it can move it." };
+    return { error: "Solo quien hizo la reserva puede moverla." };
   }
 
   try {
@@ -186,7 +190,7 @@ export async function moveBooking(input: {
     });
   } catch (err) {
     if ((err instanceof Error && err.message === "OVERLAP") || isOverlapError(err)) {
-      return { error: `${appointment.space.name} is already booked then.` };
+      return { error: `${appointment.space.name} ya está reservado en ese horario.` };
     }
     throw err;
   }
@@ -201,7 +205,7 @@ export async function cancelBooking(id: string): Promise<ActionResult> {
   const appointment = await prisma.appointment.findUnique({ where: { id } });
   if (!appointment) return { ok: true };
   if (appointment.userId !== user.id && !isAdmin(user.role)) {
-    return { error: "You can only cancel your own bookings." };
+    return { error: "Solo podés cancelar tus propias reservas." };
   }
   await prisma.appointment.delete({ where: { id } });
   revalidatePath("/calendar");

@@ -11,7 +11,7 @@ const sans = Hanken_Grotesk({
 
 export const metadata: Metadata = {
   title: "Faro Schedule",
-  description: "Book the office Hall and Meeting Room.",
+  description: "Reservá el Salón y la Sala de Reuniones de la oficina.",
 };
 
 export const viewport: Viewport = {
@@ -25,7 +25,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={sans.variable}>
+    <html lang="es" className={sans.variable}>
       <body>{children}</body>
     </html>
   );

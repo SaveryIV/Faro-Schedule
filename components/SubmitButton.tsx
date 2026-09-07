@@ -19,7 +19,7 @@ export function SubmitButton({
         className
       }
     >
-      {pending ? "Working…" : children}
+      {pending ? "Procesando…" : children}
     </button>
   );
 }

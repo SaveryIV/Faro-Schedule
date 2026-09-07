@@ -29,7 +29,7 @@ export function AppointmentForm({
         </p>
       )}
 
-      <Field label="Space" error={state.fieldErrors?.spaceId}>
+      <Field label="Espacio" error={state.fieldErrors?.spaceId}>
         <select name="spaceId" required defaultValue={spaces[0]?.id} className={inputClass}>
           {spaces.map((s) => (
             <option key={s.id} value={s.id}>
@@ -39,12 +39,12 @@ export function AppointmentForm({
         </select>
       </Field>
 
-      <Field label="Title" error={state.fieldErrors?.title} hint="What is the room for?">
+      <Field label="Título" error={state.fieldErrors?.title} hint="¿Para qué es la sala?">
         <input name="title" type="text" required maxLength={120} className={inputClass} />
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Start" error={state.fieldErrors?.startsAtLocal}>
+        <Field label="Inicio" error={state.fieldErrors?.startsAtLocal}>
           <input
             name="startsAtLocal"
             type="datetime-local"
@@ -53,7 +53,7 @@ export function AppointmentForm({
             className={inputClass}
           />
         </Field>
-        <Field label="End" error={state.fieldErrors?.endsAtLocal}>
+        <Field label="Fin" error={state.fieldErrors?.endsAtLocal}>
           <input
             name="endsAtLocal"
             type="datetime-local"
@@ -64,7 +64,7 @@ export function AppointmentForm({
         </Field>
       </div>
 
-      <SubmitButton>Create booking</SubmitButton>
+      <SubmitButton>Crear reserva</SubmitButton>
     </form>
   );
 }

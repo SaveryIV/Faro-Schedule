@@ -3,13 +3,13 @@ import type { Metadata } from "next";
 import { AuthShell } from "@/components/AuthShell";
 import { RegisterForm } from "./RegisterForm";
 
-export const metadata: Metadata = { title: "Request access · Faro Schedule" };
+export const metadata: Metadata = { title: "Solicitar acceso · Faro Schedule" };
 
 export default function RegisterPage() {
   return (
     <AuthShell
-      title="Request access"
-      subtitle="Your account is reviewed by an office admin before it is activated."
+      title="Solicitar acceso"
+      subtitle="Un administrador revisa tu cuenta antes de activarla."
     >
       <RegisterForm />
     </AuthShell>

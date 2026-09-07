@@ -16,11 +16,11 @@ export function RegisterForm() {
     return (
       <div className="space-y-4 text-center">
         <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-300">
-          Request received. An admin needs to approve your account before you can
-          sign in.
+          Recibimos tu solicitud. Un administrador debe aprobar tu cuenta antes
+          de que puedas iniciar sesión.
         </p>
         <Link href="/login" className="text-sm font-medium underline">
-          Back to sign in
+          Volver a iniciar sesión
         </Link>
       </div>
     );
@@ -34,16 +34,16 @@ export function RegisterForm() {
         </p>
       )}
 
-      <Field label="Full name" error={state.fieldErrors?.name}>
+      <Field label="Nombre completo" error={state.fieldErrors?.name}>
         <input name="name" type="text" autoComplete="name" required className={inputClass} />
       </Field>
-      <Field label="Email" error={state.fieldErrors?.email}>
+      <Field label="Correo electrónico" error={state.fieldErrors?.email}>
         <input name="email" type="email" autoComplete="email" required className={inputClass} />
       </Field>
       <Field
-        label="Password"
+        label="Contraseña"
         error={state.fieldErrors?.password}
-        hint="At least 8 characters."
+        hint="Al menos 8 caracteres."
       >
         <input
           name="password"
@@ -53,7 +53,7 @@ export function RegisterForm() {
           className={inputClass}
         />
       </Field>
-      <Field label="Confirm password" error={state.fieldErrors?.confirmPassword}>
+      <Field label="Confirmar contraseña" error={state.fieldErrors?.confirmPassword}>
         <input
           name="confirmPassword"
           type="password"
@@ -63,12 +63,12 @@ export function RegisterForm() {
         />
       </Field>
 
-      <SubmitButton className="w-full">Request access</SubmitButton>
+      <SubmitButton className="w-full">Solicitar acceso</SubmitButton>
 
       <p className="text-center text-sm text-neutral-500">
-        Already have an account?{" "}
+        ¿Ya tenés cuenta?{" "}
         <Link href="/login" className="font-medium underline">
-          Sign in
+          Iniciar sesión
         </Link>
       </p>
     </form>
