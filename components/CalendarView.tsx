@@ -33,6 +33,8 @@ const SPACE_DOT: Record<string, string> = {
   "meeting-room": "bg-violet-500",
 };
 
+const MOBILE_QUERY = "(max-width: 767px)";
+
 /** Poll the events endpoint this often to pick up other people's changes. */
 const POLL_MS = 7_000;
 /** Faster cadence while the "new booking" dialog is open — the window in which
@@ -72,12 +74,28 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Live-sync bookkeeping.
   const lastSigRef = useRef<string | null>(null);
   const mutatingRef = useRef(false);
 
   useEffect(() => setMounted(true), []);
+
+  // Match the calendar view to the screen: a 3-day strip on phones, the full
+  // week on larger screens. Switches live on rotate / resize.
+  useEffect(() => {
+    const mql = window.matchMedia(MOBILE_QUERY);
+    const apply = () => {
+      setIsMobile(mql.matches);
+      calendarRef.current
+        ?.getApi()
+        .changeView(mql.matches ? "timeGridThreeDay" : "timeGridWeek");
+    };
+    apply();
+    mql.addEventListener("change", apply);
+    return () => mql.removeEventListener("change", apply);
+  }, [mounted]);
 
   useEffect(() => {
     if (!toast) return;
@@ -282,7 +300,7 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
     }
     return (
       <div className="flex h-full flex-col gap-px overflow-hidden px-1.5 py-0.5 leading-tight">
-        <div className="truncate text-[9px] font-semibold uppercase tracking-wide opacity-70">
+        <div className="truncate text-[9px] font-semibold opacity-75">
           {arg.event.extendedProps.spaceName}
         </div>
         <div className="truncate text-[12px] font-semibold">{arg.event.title}</div>
@@ -295,7 +313,14 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="hidden items-center justify-between gap-3 sm:flex">
+        <h1 className="text-xl font-bold tracking-tight">Calendar</h1>
+        <p className="hidden text-xs text-stone-500 lg:block">
+          Click a slot to book, or a booking to change its time
+        </p>
+      </div>
+
+      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pt-1 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 sm:pt-0 sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={() => selectSpace("")}
@@ -311,22 +336,20 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
             className={chipClass(activeSpace === s.slug)}
           >
             <span
-              className={`inline-block h-2 w-2 rounded-full ${SPACE_DOT[s.slug] ?? "bg-neutral-400"}`}
+              className={`inline-block h-2 w-2 rounded-full ${SPACE_DOT[s.slug] ?? "bg-stone-400"}`}
             />
             {s.name}
           </button>
         ))}
-        <span className="ml-auto hidden text-xs text-neutral-500 sm:inline">
-          Click an empty slot to book · click a booking to retime it
-        </span>
       </div>
 
       {toast && (
         <p
+          role="status"
           className={
-            "rounded-md px-3 py-2 text-sm " +
+            "rounded-lg px-3 py-2 text-sm " +
             (toast.kind === "info"
-              ? "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+              ? "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-200"
               : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300")
           }
         >
@@ -334,17 +357,37 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
         </p>
       )}
 
-      <div className="fc-faro rounded-xl border border-neutral-200 bg-white p-2 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="fc-faro -mx-4 border-y border-stone-200 bg-white p-1.5 sm:mx-0 sm:rounded-xl sm:border sm:p-2 dark:border-stone-800 dark:bg-stone-900">
         {mounted ? (
           <FullCalendar
             ref={calendarRef}
             plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
-            headerToolbar={{
-              left: "prev,next today",
-              center: "title",
-              right: "timeGridWeek,timeGridDay,dayGridMonth",
+            initialView={
+              typeof window !== "undefined" &&
+              window.matchMedia(MOBILE_QUERY).matches
+                ? "timeGridThreeDay"
+                : "timeGridWeek"
+            }
+            views={{
+              timeGridThreeDay: {
+                type: "timeGrid",
+                duration: { days: 3 },
+              },
             }}
+            headerToolbar={
+              isMobile
+                ? { left: "prev,next", center: "title", right: "today" }
+                : {
+                    left: "prev,next today",
+                    center: "title",
+                    right: "timeGridWeek,timeGridDay,dayGridMonth",
+                  }
+            }
+            titleFormat={
+              isMobile
+                ? { month: "short", day: "numeric" }
+                : { month: "short", day: "numeric", year: "numeric" }
+            }
             buttonText={{
               today: "Today",
               week: "Week",
@@ -383,7 +426,7 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
             eventContent={renderEvent}
           />
         ) : (
-          <div className="h-[600px] animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800" />
+          <div className="h-[600px] animate-pulse rounded-lg bg-stone-100 dark:bg-stone-800" />
         )}
       </div>
 
@@ -428,14 +471,28 @@ type RunMutation = <T>(fn: () => Promise<T>) => Promise<T>;
 
 function chipClass(active: boolean) {
   return (
-    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition border-neutral-300 dark:border-neutral-700 " +
+    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition " +
     (active
-      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-      : "hover:bg-neutral-100 dark:hover:bg-neutral-800")
+      ? "border-transparent bg-stone-900 text-white dark:bg-white dark:text-stone-900"
+      : "border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800")
   );
 }
 
 // ---------------------------------------------------------------------------
+
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function Modal({
   title,
@@ -449,36 +506,60 @@ function Modal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [onClose]);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={onClose}
+      className="animate-fade-in fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
-        onMouseDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="animate-sheet-up flex max-h-[88vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:max-h-[85vh] sm:max-w-md sm:rounded-2xl sm:border sm:border-stone-200 dark:bg-stone-900 dark:sm:border-stone-800"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold">{title}</h2>
+        <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-5 py-4 dark:border-stone-800">
+          <h2 className="text-[15px] font-bold tracking-tight">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800"
+            aria-label="Close"
+            className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800"
           >
-            ✕
+            <CloseIcon />
           </button>
         </div>
-        {children}
+        <div className="overflow-y-auto px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4">
+          {children}
+        </div>
       </div>
     </div>
   );
 }
 
+// text-base (16px) keeps iOS Safari from auto-zooming when a field is focused.
 const inputClass =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-500 dark:border-neutral-700 dark:bg-neutral-950";
+  "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base outline-none transition focus:border-beam-500 dark:border-stone-700 dark:bg-stone-950";
+
+const primaryButton =
+  "inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:opacity-60 sm:w-auto dark:bg-white dark:text-stone-900 dark:hover:bg-stone-200";
+
+const secondaryButton =
+  "inline-flex min-h-[44px] w-full items-center justify-center rounded-lg px-4 text-sm font-medium text-stone-600 transition hover:bg-stone-100 sm:w-auto dark:text-stone-300 dark:hover:bg-stone-800";
+
+const errorBox =
+  "rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300";
+
+const fieldLabel = "text-sm font-medium text-stone-600 dark:text-stone-300";
 
 function BookingDialog({
   spaces,
@@ -532,14 +613,10 @@ function BookingDialog({
 
   return (
     <Modal title="New booking" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-3">
-        {error && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-            {error}
-          </p>
-        )}
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Space</span>
+      <form onSubmit={submit} className="space-y-4">
+        {error && <p className={errorBox}>{error}</p>}
+        <label className="block space-y-1.5">
+          <span className={fieldLabel}>Space</span>
           <select
             value={spaceId}
             onChange={(e) => setSpaceId(e.target.value)}
@@ -552,8 +629,8 @@ function BookingDialog({
             ))}
           </select>
         </label>
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Title</span>
+        <label className="block space-y-1.5">
+          <span className={fieldLabel}>Title</span>
           <input
             autoFocus
             value={title}
@@ -565,8 +642,8 @@ function BookingDialog({
           />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Start</span>
+          <label className="block space-y-1.5">
+            <span className={fieldLabel}>Start</span>
             <input
               type="datetime-local"
               step={60}
@@ -576,8 +653,8 @@ function BookingDialog({
               className={inputClass}
             />
           </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">End</span>
+          <label className="block space-y-1.5">
+            <span className={fieldLabel}>End</span>
             <input
               type="datetime-local"
               step={60}
@@ -588,19 +665,11 @@ function BookingDialog({
             />
           </label>
         </div>
-        <div className="flex justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-          >
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} className={secondaryButton}>
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-          >
+          <button type="submit" disabled={pending} className={primaryButton}>
             {pending ? "Saving…" : "Create booking"}
           </button>
         </div>
@@ -662,33 +731,26 @@ function EventDialog({
 
   return (
     <Modal title={dialog.title} onClose={onClose}>
-      <dl className="space-y-2 text-sm">
-        <div className="flex gap-2">
-          <dt className="w-20 shrink-0 text-neutral-500">Space</dt>
-          <dd className="font-medium">{dialog.spaceName}</dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="w-20 shrink-0 text-neutral-500">When</dt>
-          <dd>
-            {formatOffice(dialog.start)} – {formatOffice(dialog.end)}
-          </dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="w-20 shrink-0 text-neutral-500">Booked by</dt>
-          <dd>{dialog.bookedBy}</dd>
-        </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt className="text-stone-500">Space</dt>
+        <dd className="font-medium">{dialog.spaceName}</dd>
+        <dt className="text-stone-500">When</dt>
+        <dd>
+          {formatOffice(dialog.start)} – {formatOffice(dialog.end)}
+        </dd>
+        <dt className="text-stone-500">Booked by</dt>
+        <dd>{dialog.bookedBy}</dd>
       </dl>
 
       {dialog.canMove && (
-        <form onSubmit={saveTime} className="mt-4 space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-          {timeError && (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-              {timeError}
-            </p>
-          )}
+        <form
+          onSubmit={saveTime}
+          className="mt-5 space-y-3 border-t border-stone-200 pt-5 dark:border-stone-800"
+        >
+          {timeError && <p className={errorBox}>{timeError}</p>}
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-1">
-              <span className="text-sm font-medium">Start</span>
+            <label className="block space-y-1.5">
+              <span className={fieldLabel}>Start</span>
               <input
                 type="datetime-local"
                 step={60}
@@ -698,8 +760,8 @@ function EventDialog({
                 className={inputClass}
               />
             </label>
-            <label className="block space-y-1">
-              <span className="text-sm font-medium">End</span>
+            <label className="block space-y-1.5">
+              <span className={fieldLabel}>End</span>
               <input
                 type="datetime-local"
                 step={60}
@@ -710,20 +772,14 @@ function EventDialog({
               />
             </label>
           </div>
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={savingTime}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-            >
-              {savingTime ? "Saving…" : "Save time"}
-            </button>
-          </div>
+          <button type="submit" disabled={savingTime} className={primaryButton}>
+            {savingTime ? "Saving…" : "Save time"}
+          </button>
         </form>
       )}
 
       {!dialog.mine && (
-        <p className="mt-4 rounded-md bg-neutral-50 px-3 py-2 text-xs text-neutral-500 dark:bg-neutral-800/60">
+        <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500 dark:bg-stone-800/60">
           {dialog.canDelete
             ? "Someone else booked this. As an admin you can cancel it, but only they can move it."
             : "Someone else booked this. Only they can change or cancel it."}
@@ -731,16 +787,14 @@ function EventDialog({
       )}
 
       {dialog.canDelete && (
-        <div className="mt-5 flex justify-end">
-          <button
-            type="button"
-            onClick={remove}
-            disabled={pending}
-            className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
-          >
-            {pending ? "Cancelling…" : "Cancel this booking"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={remove}
+          disabled={pending}
+          className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-800/70 dark:text-red-300 dark:hover:bg-red-950"
+        >
+          {pending ? "Cancelling…" : "Cancel this booking"}
+        </button>
       )}
     </Modal>
   );

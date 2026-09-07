@@ -21,19 +21,23 @@ export default async function NewAppointmentPage() {
   const end = new Date(start.getTime() + 60 * 60_000);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-lg space-y-5">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">New booking</h1>
-        <p className="text-sm text-neutral-500">
-          Times are in office time ({OFFICE_TZ}). Overlapping bookings for the
-          same space are not allowed.
+        <h1 className="text-lg font-bold tracking-tight sm:text-xl">
+          New booking
+        </h1>
+        <p className="mt-1 text-sm text-stone-500">
+          Times are office time ({OFFICE_TZ}). Two bookings can&rsquo;t overlap in
+          the same room.
         </p>
       </div>
-      <AppointmentForm
-        spaces={spaces}
-        defaultStart={officeLocalInputValue(start)}
-        defaultEnd={officeLocalInputValue(end)}
-      />
+      <div className="rounded-xl border border-stone-200 bg-white p-4 sm:p-5 dark:border-stone-800 dark:bg-stone-900">
+        <AppointmentForm
+          spaces={spaces}
+          defaultStart={officeLocalInputValue(start)}
+          defaultEnd={officeLocalInputValue(end)}
+        />
+      </div>
     </div>
   );
 }

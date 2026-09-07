@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { Role } from "@prisma/client";
+import type { Role, UserStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-guard";
@@ -14,8 +14,14 @@ const STATUS_STYLE: Record<string, string> = {
   REJECTED: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
 };
 
+const STATUS_LABEL: Record<UserStatus, string> = {
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
 const ROLE_STYLE: Record<Role, string> = {
-  USER: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
+  USER: "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300",
   ADMIN: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
   SUPER_ADMIN:
     "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300",
@@ -34,20 +40,99 @@ function canActOn(callerRole: Role, targetRole: Role): boolean {
   return true;
 }
 
+type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
+  createdAt: Date;
+};
+
+const approveBtn =
+  "inline-flex min-h-9 items-center justify-center rounded-lg bg-green-600 px-3 text-xs font-semibold text-white transition hover:bg-green-500";
+const rejectBtn =
+  "inline-flex min-h-9 items-center justify-center rounded-lg border border-red-300 px-3 text-xs font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950";
+const roleBtn =
+  "inline-flex min-h-9 items-center justify-center rounded-lg border border-stone-300 px-3 text-xs font-semibold transition hover:bg-stone-100 dark:border-stone-700 dark:hover:bg-stone-800";
+
+function UserActions({
+  u,
+  callerRole,
+  self,
+}: {
+  u: AdminUser;
+  callerRole: Role;
+  self: boolean;
+}) {
+  const actionable = !self && canActOn(callerRole, u.role);
+  const canManageRole =
+    callerRole === "SUPER_ADMIN" && !self && u.status === "APPROVED";
+  const roleTargets = (["USER", "ADMIN", "SUPER_ADMIN"] as Role[]).filter(
+    (r) => r !== u.role,
+  );
+
+  if (self) {
+    return (
+      <span className="text-xs text-stone-400">
+        {u.role === "SUPER_ADMIN" ? "Super admin — you" : "You"}
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {actionable && u.status !== "APPROVED" && (
+        <form action={approveUser}>
+          <input type="hidden" name="id" value={u.id} />
+          <button className={approveBtn}>Approve</button>
+        </form>
+      )}
+      {actionable && u.status !== "REJECTED" && (
+        <form action={rejectUser}>
+          <input type="hidden" name="id" value={u.id} />
+          <button className={rejectBtn}>Reject</button>
+        </form>
+      )}
+      {canManageRole &&
+        roleTargets.map((r) => (
+          <form action={setUserRole} key={r}>
+            <input type="hidden" name="id" value={u.id} />
+            <input type="hidden" name="role" value={r} />
+            <button className={roleBtn}>Make {ROLE_LABEL[r].toLowerCase()}</button>
+          </form>
+        ))}
+      {!actionable && !canManageRole && (
+        <span className="text-xs text-stone-400">No actions</span>
+      )}
+    </div>
+  );
+}
+
+function Badge({ className, children }: { className: string; children: string }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${className}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 export default async function AdminUsersPage() {
   const caller = await requireAdmin();
 
-  const users = await prisma.user.findMany({
+  const users = (await prisma.user.findMany({
     orderBy: { createdAt: "asc" },
-  });
+  })) as AdminUser[];
   const order = { PENDING: 0, APPROVED: 1, REJECTED: 2 } as const;
   users.sort((a, b) => order[a.status] - order[b.status]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Users</h1>
-        <p className="text-sm text-neutral-500">
+        <h1 className="text-lg font-bold tracking-tight sm:text-xl">Users</h1>
+        <p className="mt-1 text-sm text-stone-500">
           Approve new coworkers so they can see and create bookings.
           {caller.role === "SUPER_ADMIN"
             ? " As super admin, you can also grant or revoke admin rights."
@@ -55,92 +140,85 @@ export default async function AdminUsersPage() {
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-800">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
+      {/* Mobile: one card per user */}
+      <ul className="space-y-3 md:hidden">
+        {users.map((u) => {
+          const self = u.id === caller.id;
+          return (
+            <li
+              key={u.id}
+              className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    {u.name}
+                    {self && (
+                      <span className="ml-1 text-xs font-normal text-stone-400">
+                        (you)
+                      </span>
+                    )}
+                  </p>
+                  <p className="truncate text-sm text-stone-500">{u.email}</p>
+                </div>
+                <span className="shrink-0 text-xs text-stone-400">
+                  {formatOffice(u.createdAt, "d MMM yyyy")}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <Badge className={STATUS_STYLE[u.status]}>
+                  {STATUS_LABEL[u.status]}
+                </Badge>
+                <Badge className={ROLE_STYLE[u.role]}>{ROLE_LABEL[u.role]}</Badge>
+              </div>
+              <div className="mt-3">
+                <UserActions u={u} callerRole={caller.role} self={self} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Desktop: table */}
+      <div className="hidden overflow-hidden rounded-xl border border-stone-200 md:block dark:border-stone-800">
+        <table className="w-full text-sm">
+          <thead className="bg-stone-50 text-left text-xs font-semibold text-stone-500 dark:bg-stone-900">
             <tr>
-              <th className="px-4 py-2 font-medium">Name</th>
-              <th className="px-4 py-2 font-medium">Email</th>
-              <th className="px-4 py-2 font-medium">Requested</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Role</th>
-              <th className="px-4 py-2 font-medium">Actions</th>
+              <th className="px-4 py-2.5">Name</th>
+              <th className="px-4 py-2.5">Email</th>
+              <th className="px-4 py-2.5">Requested</th>
+              <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5">Role</th>
+              <th className="px-4 py-2.5">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+          <tbody className="divide-y divide-stone-200 dark:divide-stone-800">
             {users.map((u) => {
               const self = u.id === caller.id;
-              const actionable = !self && canActOn(caller.role, u.role);
-              const canManageRole =
-                caller.role === "SUPER_ADMIN" &&
-                !self &&
-                u.status === "APPROVED";
-              const roleTargets: Role[] = (
-                ["USER", "ADMIN", "SUPER_ADMIN"] as Role[]
-              ).filter((r) => r !== u.role);
-
               return (
-                <tr key={u.id} className="bg-white dark:bg-neutral-950">
+                <tr key={u.id} className="bg-white dark:bg-stone-950">
                   <td className="px-4 py-3 font-medium">
                     {u.name}
                     {self && (
-                      <span className="ml-1 text-xs text-neutral-400">(you)</span>
+                      <span className="ml-1 text-xs text-stone-400">(you)</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">
-                    {u.email}
-                  </td>
-                  <td className="px-4 py-3 text-neutral-500">
+                  <td className="px-4 py-3 text-stone-500">{u.email}</td>
+                  <td className="px-4 py-3 text-stone-400">
                     {formatOffice(u.createdAt, "d MMM yyyy")}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[u.status]}`}
-                    >
-                      {u.status}
-                    </span>
+                    <Badge className={STATUS_STYLE[u.status]}>
+                      {STATUS_LABEL[u.status]}
+                    </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_STYLE[u.role]}`}
-                    >
+                    <Badge className={ROLE_STYLE[u.role]}>
                       {ROLE_LABEL[u.role]}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {actionable && u.status !== "APPROVED" && (
-                        <form action={approveUser}>
-                          <input type="hidden" name="id" value={u.id} />
-                          <button className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-500">
-                            Approve
-                          </button>
-                        </form>
-                      )}
-                      {actionable && u.status !== "REJECTED" && (
-                        <form action={rejectUser}>
-                          <input type="hidden" name="id" value={u.id} />
-                          <button className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950">
-                            Reject
-                          </button>
-                        </form>
-                      )}
-                      {canManageRole &&
-                        roleTargets.map((r) => (
-                          <form action={setUserRole} key={r}>
-                            <input type="hidden" name="id" value={u.id} />
-                            <input type="hidden" name="role" value={r} />
-                            <button className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800">
-                              Set {ROLE_LABEL[r].toLowerCase()}
-                            </button>
-                          </form>
-                        ))}
-                      {self && (
-                        <span className="text-xs text-neutral-400">
-                          {u.role === "SUPER_ADMIN" ? "Super admin" : "You"}
-                        </span>
-                      )}
-                    </div>
+                    <UserActions u={u} callerRole={caller.role} self={self} />
                   </td>
                 </tr>
               );

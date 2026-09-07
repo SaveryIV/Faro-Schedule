@@ -14,10 +14,5 @@ export default async function CalendarPage() {
     select: { id: true, name: true, slug: true },
   });
 
-  return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold tracking-tight">Calendar</h1>
-      <CalendarView spaces={spaces} />
-    </div>
-  );
+  return <CalendarView spaces={spaces} />;
 }

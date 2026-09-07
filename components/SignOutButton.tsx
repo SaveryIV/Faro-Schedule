@@ -6,7 +6,7 @@ export function SignOutButton({ className = "" }: { className?: string }) {
       <button
         type="submit"
         className={
-          "rounded-md px-3 py-1.5 text-sm text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 " +
+          "rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 " +
           className
         }
       >
