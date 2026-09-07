@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     include: {
       space: { select: { name: true, slug: true } },
       user: { select: { name: true } },
+      series: { select: { frequency: true } },
     },
     orderBy: { startsAt: "asc" },
   });
@@ -61,6 +62,8 @@ export async function GET(req: NextRequest) {
         mine,
         canMove,
         canDelete,
+        seriesId: a.seriesId,
+        seriesFrequency: a.series?.frequency ?? null,
       },
     };
   });

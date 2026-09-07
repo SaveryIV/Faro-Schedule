@@ -19,6 +19,11 @@ enum UserStatus {
   REJECTED
 }
 
+enum RecurrenceFrequency {
+  WEEKLY
+  MONTHLY
+}
+
 model User {
   id           String       @id @default(cuid())
   email        String       @unique
@@ -28,12 +33,27 @@ model User {
   status       UserStatus   @default(PENDING)
   createdAt    DateTime     @default(now())
   appointments Appointment[]
+  series       AppointmentSeries[]
 }
 
 model Space {
   id           String       @id @default(cuid())
   name         String       @unique
   slug         String       @unique
+  appointments Appointment[]
+}
+
+/// A recurring booking. Every occurrence is a real `Appointment` row that points
+/// back here; deleting this row cascades to every occurrence ("cancel the whole
+/// series"). The room lives on each occurrence, not here.
+model AppointmentSeries {
+  id           String              @id @default(cuid())
+  frequency    RecurrenceFrequency
+  createdAt    DateTime            @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   appointments Appointment[]
 }
 
@@ -50,6 +70,10 @@ model Appointment {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  seriesId String?
+  series   AppointmentSeries? @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
   @@index([spaceId, startsAt])
   @@index([userId])
+  @@index([seriesId])
 }

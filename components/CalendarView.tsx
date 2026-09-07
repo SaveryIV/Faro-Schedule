@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { addMonths } from "date-fns";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -23,11 +24,18 @@ import {
 } from "@/app/(app)/appointments/actions";
 import {
   formatOffice,
+  officeDayKey,
   officeLocalInputValue,
   officeLocalToUtc,
 } from "@/lib/tz";
 
 type SpaceOption = { id: string; name: string; slug: string };
+type Frequency = "WEEKLY" | "MONTHLY";
+
+const FREQ_SENTENCE: Record<Frequency, string> = {
+  WEEKLY: "Esta reserva se repite cada semana.",
+  MONTHLY: "Esta reserva se repite cada mes.",
+};
 
 const SPACE_DOT: Record<string, string> = {
   hall: "bg-sky-500",
@@ -66,6 +74,8 @@ type Dialog =
       mine: boolean;
       canMove: boolean;
       canDelete: boolean;
+      seriesId: string | null;
+      seriesFrequency: Frequency | null;
     };
 
 export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
@@ -259,6 +269,8 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
       mine: Boolean(e.extendedProps.mine),
       canMove: Boolean(e.extendedProps.canMove),
       canDelete: Boolean(e.extendedProps.canDelete),
+      seriesId: e.extendedProps.seriesId ?? null,
+      seriesFrequency: (e.extendedProps.seriesFrequency as Frequency | null) ?? null,
     });
   }, []);
 
@@ -441,9 +453,10 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
           runMutation={runMutation}
           onClose={() => setDialog(null)}
           onConflict={refresh}
-          onDone={() => {
+          onDone={(info) => {
             setDialog(null);
             refresh();
+            if (info) setToast({ text: info, kind: "info" });
           }}
         />
       )}
@@ -580,7 +593,7 @@ function BookingDialog({
   runMutation: RunMutation;
   onClose: () => void;
   onConflict: () => void;
-  onDone: () => void;
+  onDone: (info?: string) => void;
 }) {
   const initialSpace =
     spaces.find((s) => s.slug === defaultSpaceSlug)?.id ?? spaces[0]?.id ?? "";
@@ -588,6 +601,10 @@ function BookingDialog({
   const [title, setTitle] = useState("");
   const [startStr, setStartStr] = useState(officeLocalInputValue(start));
   const [endStr, setEndStr] = useState(officeLocalInputValue(end));
+  const [frequency, setFrequency] = useState<"" | Frequency>("");
+  const [repeatUntil, setRepeatUntil] = useState(() =>
+    officeDayKey(addMonths(start, 3)),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -601,11 +618,20 @@ function BookingDialog({
         title,
         startISO: officeLocalToUtc(startStr).toISOString(),
         endISO: officeLocalToUtc(endStr).toISOString(),
+        frequency: frequency || undefined,
+        repeatUntil: frequency ? repeatUntil : undefined,
       }),
     );
     setPending(false);
     if ("ok" in res && res.ok) {
-      onDone();
+      let info: string | undefined;
+      if (res.made && res.made > 1) {
+        info = `Se crearon ${res.made} reservas.`;
+        if (res.skipped) {
+          info += ` Se ${res.skipped === 1 ? "omitió 1 fecha" : `omitieron ${res.skipped} fechas`} por superposición.`;
+        }
+      }
+      onDone(info);
     } else {
       setError((res as { error: string }).error);
       // Surface the booking that blocked us, behind the dialog.
@@ -667,12 +693,37 @@ function BookingDialog({
             />
           </label>
         </div>
+        <label className="block space-y-1.5">
+          <span className={fieldLabel}>Repetición</span>
+          <select
+            value={frequency}
+            onChange={(e) => setFrequency(e.target.value as "" | Frequency)}
+            className={inputClass}
+          >
+            <option value="">No se repite</option>
+            <option value="WEEKLY">Cada semana</option>
+            <option value="MONTHLY">Cada mes</option>
+          </select>
+        </label>
+        {frequency && (
+          <label className="block space-y-1.5">
+            <span className={fieldLabel}>Repetir hasta</span>
+            <input
+              type="date"
+              value={repeatUntil}
+              min={startStr.slice(0, 10)}
+              onChange={(e) => setRepeatUntil(e.target.value)}
+              required
+              className={inputClass}
+            />
+          </label>
+        )}
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className={secondaryButton}>
             Cancelar
           </button>
           <button type="submit" disabled={pending} className={primaryButton}>
-            {pending ? "Guardando…" : "Crear reserva"}
+            {pending ? "Guardando…" : frequency ? "Crear reservas" : "Crear reserva"}
           </button>
         </div>
       </form>
@@ -703,6 +754,10 @@ function EventDialog({
   const [savingTime, setSavingTime] = useState(false);
   const [timeError, setTimeError] = useState<string | null>(null);
 
+  const isSeries = Boolean(dialog.seriesId);
+  const [scope, setScope] = useState<"one" | "series">("one");
+  const showScope = isSeries && (dialog.canMove || dialog.canDelete);
+
   async function saveTime(e: React.FormEvent) {
     e.preventDefault();
     setSavingTime(true);
@@ -712,6 +767,7 @@ function EventDialog({
         id: dialog.id,
         startISO: officeLocalToUtc(startStr).toISOString(),
         endISO: officeLocalToUtc(endStr).toISOString(),
+        scope: isSeries ? scope : undefined,
       }),
     );
     setSavingTime(false);
@@ -725,7 +781,9 @@ function EventDialog({
 
   async function remove() {
     setPending(true);
-    const res = await runMutation(() => cancelBooking(dialog.id));
+    const res = await runMutation(() =>
+      cancelBooking(dialog.id, isSeries ? scope : "one"),
+    );
     setPending(false);
     if ("ok" in res && res.ok) onCancelled();
     else onError((res as { error: string }).error);
@@ -743,6 +801,37 @@ function EventDialog({
         <dt className="text-stone-500">Reservado por</dt>
         <dd>{dialog.bookedBy}</dd>
       </dl>
+
+      {isSeries && dialog.seriesFrequency && (
+        <p className="mt-3 text-xs text-stone-500">
+          {FREQ_SENTENCE[dialog.seriesFrequency]}
+        </p>
+      )}
+
+      {showScope && (
+        <div className="mt-4 flex rounded-lg border border-stone-300 p-0.5 text-sm dark:border-stone-700">
+          {(
+            [
+              ["one", "Solo esta reserva"],
+              ["series", "Toda la serie"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setScope(value)}
+              className={
+                "flex-1 rounded-md px-3 py-1.5 font-medium transition " +
+                (scope === value
+                  ? "bg-stone-900 text-white dark:bg-white dark:text-stone-900"
+                  : "text-stone-600 dark:text-stone-300")
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {dialog.canMove && (
         <form
@@ -775,7 +864,11 @@ function EventDialog({
             </label>
           </div>
           <button type="submit" disabled={savingTime} className={primaryButton}>
-            {savingTime ? "Guardando…" : "Guardar horario"}
+            {savingTime
+              ? "Guardando…"
+              : isSeries && scope === "series"
+                ? "Guardar horario de la serie"
+                : "Guardar horario"}
           </button>
         </form>
       )}
@@ -795,7 +888,11 @@ function EventDialog({
           disabled={pending}
           className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-800/70 dark:text-red-300 dark:hover:bg-red-950"
         >
-          {pending ? "Cancelando…" : "Cancelar esta reserva"}
+          {pending
+            ? "Cancelando…"
+            : isSeries && scope === "series"
+              ? "Cancelar toda la serie"
+              : "Cancelar esta reserva"}
         </button>
       )}
     </Modal>
