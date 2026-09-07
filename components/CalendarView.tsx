@@ -126,15 +126,30 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
         end: info.endStr,
       });
       if (spaceRef.current) params.set("space", spaceRef.current);
-      fetch(`/api/appointments?${params.toString()}`)
-        .then((r) =>
-          r.ok ? r.json() : Promise.reject(new Error("Could not load bookings")),
-        )
-        .then((data: EventInput[]) => {
-          lastSigRef.current = signatureOf(data);
-          success(data);
-        })
-        .catch(failure);
+      const url = `/api/appointments?${params.toString()}`;
+
+      // Retry a couple of times: the first request after the database has
+      // scaled to zero can fail while it wakes, and FullCalendar does not
+      // retry a failed event source on its own.
+      const load = (retriesLeft: number): Promise<void> =>
+        fetch(url)
+          .then((r) =>
+            r.ok ? r.json() : Promise.reject(new Error("Could not load bookings")),
+          )
+          .then((data: EventInput[]) => {
+            lastSigRef.current = signatureOf(data);
+            success(data);
+          })
+          .catch((err: Error) => {
+            if (retriesLeft > 0) {
+              return new Promise<void>((res) =>
+                setTimeout(() => res(load(retriesLeft - 1)), 1500),
+              );
+            }
+            failure(err);
+          });
+
+      void load(2);
     },
     [],
   );
@@ -163,7 +178,11 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
         const sig = signatureOf(data);
         const known = lastSigRef.current;
         lastSigRef.current = sig;
-        if (known !== null && sig !== known) {
+        if (known === null) {
+          // We never got a good baseline (initial load failed) — repaint
+          // quietly so a cold-start empty grid recovers.
+          api.refetchEvents();
+        } else if (sig !== known) {
           api.refetchEvents();
           setToast({ text: "Calendar updated", kind: "info" });
         }
@@ -195,9 +214,16 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
   }, []);
 
   const handleDateClick = useCallback((arg: DateClickArg) => {
+    // Month view: a tap drills into that day.
     if (arg.view.type === "dayGridMonth") {
       calendarRef.current?.getApi().changeView("timeGridDay", arg.date);
+      return;
     }
+    // Time views: a single tap/click on an empty slot starts a booking
+    // (defaulting to one hour) — no drag needed, which is awkward on phones.
+    const start = arg.date;
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    setDialog({ mode: "create", start, end });
   }, []);
 
   const handleEventClick = useCallback((arg: EventClickArg) => {
@@ -291,7 +317,7 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
           </button>
         ))}
         <span className="ml-auto hidden text-xs text-neutral-500 sm:inline">
-          Drag an empty slot to book · click a booking to retime it
+          Click an empty slot to book · click a booking to retime it
         </span>
       </div>
 
