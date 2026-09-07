@@ -13,13 +13,27 @@ const ROOM_DOT: Record<string, string> = {
   "meeting-room": "bg-violet-500",
 };
 
+const FREQ_LABEL: Record<string, string> = {
+  WEEKLY: "se repite cada semana",
+  MONTHLY: "se repite cada mes",
+};
+
+function createdMessage(created: string, skipped?: string): string {
+  const made = Number(created);
+  const omit = Number(skipped ?? 0);
+  const base =
+    made <= 1 ? "Reserva creada." : `Se crearon ${made} reservas.`;
+  if (!omit) return base;
+  return `${base} Se ${omit === 1 ? "omitió 1 fecha" : `omitieron ${omit} fechas`} porque la sala ya estaba ocupada.`;
+}
+
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; skipped?: string }>;
 }) {
   const user = await requireApprovedUser();
-  const { created } = await searchParams;
+  const { created, skipped } = await searchParams;
 
   const appointments = await prisma.appointment.findMany({
     where: { endsAt: { gte: new Date() } },
@@ -27,6 +41,7 @@ export default async function AppointmentsPage({
     include: {
       space: { select: { name: true, slug: true } },
       user: { select: { name: true } },
+      series: { select: { frequency: true } },
     },
   });
 
@@ -54,7 +69,7 @@ export default async function AppointmentsPage({
 
       {created && (
         <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-300">
-          Reserva creada.
+          {createdMessage(created, skipped)}
         </p>
       )}
 
@@ -95,7 +110,14 @@ export default async function AppointmentsPage({
                         <p className="mt-0.5 truncate text-sm text-stone-700 dark:text-stone-300">
                           {a.title}
                         </p>
-                        <p className="text-xs text-stone-400">{a.user.name}</p>
+                        <p className="text-xs text-stone-400">
+                          {a.user.name}
+                          {a.series && (
+                            <span className="ml-1.5 text-stone-400">
+                              · {FREQ_LABEL[a.series.frequency]}
+                            </span>
+                          )}
+                        </p>
                       </div>
                       {canDelete && (
                         <form action={deleteAppointment} className="shrink-0">

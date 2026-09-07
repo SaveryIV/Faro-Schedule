@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { createAppointment, type BookingState } from "@/app/(app)/appointments/actions";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -14,12 +14,15 @@ export function AppointmentForm({
   spaces,
   defaultStart,
   defaultEnd,
+  defaultRepeatUntil,
 }: {
   spaces: SpaceOption[];
   defaultStart: string;
   defaultEnd: string;
+  defaultRepeatUntil: string;
 }) {
   const [state, action] = useActionState(createAppointment, initial);
+  const [frequency, setFrequency] = useState("");
 
   return (
     <form action={action} className="space-y-5">
@@ -64,7 +67,36 @@ export function AppointmentForm({
         </Field>
       </div>
 
-      <SubmitButton>Crear reserva</SubmitButton>
+      <Field label="Repetición">
+        <select
+          name="frequency"
+          value={frequency}
+          onChange={(e) => setFrequency(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">No se repite</option>
+          <option value="WEEKLY">Cada semana</option>
+          <option value="MONTHLY">Cada mes</option>
+        </select>
+      </Field>
+
+      {frequency && (
+        <Field
+          label="Repetir hasta"
+          error={state.fieldErrors?.repeatUntil}
+          hint="Se crea una reserva por semana/mes hasta esta fecha."
+        >
+          <input
+            name="repeatUntil"
+            type="date"
+            required
+            defaultValue={defaultRepeatUntil}
+            className={inputClass}
+          />
+        </Field>
+      )}
+
+      <SubmitButton>{frequency ? "Crear reservas" : "Crear reserva"}</SubmitButton>
     </form>
   );
 }

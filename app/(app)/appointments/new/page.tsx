@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 
 import { prisma } from "@/lib/prisma";
 import { requireApprovedUser } from "@/lib/auth-guard";
-import { OFFICE_TZ, officeLocalInputValue } from "@/lib/tz";
+import { addMonths } from "date-fns";
+
+import { OFFICE_TZ, officeLocalInputValue, officeDayKey } from "@/lib/tz";
 import { AppointmentForm } from "@/components/AppointmentForm";
 
 export const metadata: Metadata = { title: "Nueva reserva · Faro Schedule" };
@@ -36,6 +38,7 @@ export default async function NewAppointmentPage() {
           spaces={spaces}
           defaultStart={officeLocalInputValue(start)}
           defaultEnd={officeLocalInputValue(end)}
+          defaultRepeatUntil={officeDayKey(addMonths(start, 3))}
         />
       </div>
     </div>
