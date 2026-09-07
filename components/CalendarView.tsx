@@ -20,6 +20,11 @@ import {
   moveBooking,
   cancelBooking,
 } from "@/app/(app)/appointments/actions";
+import {
+  formatOffice,
+  officeLocalInputValue,
+  officeLocalToUtc,
+} from "@/lib/tz";
 
 type SpaceOption = { id: string; name: string; slug: string };
 
@@ -28,12 +33,21 @@ const SPACE_DOT: Record<string, string> = {
   "meeting-room": "bg-violet-500",
 };
 
-function pad(n: number) {
-  return String(n).padStart(2, "0");
-}
-/** Date -> "yyyy-MM-ddTHH:mm" in the browser's local time (for datetime-local inputs). */
-function toLocalInput(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** Poll the events endpoint this often to pick up other people's changes. */
+const POLL_MS = 7_000;
+/** Faster cadence while the "new booking" dialog is open — the window in which
+ *  a stale calendar leads to a double-book. */
+const POLL_MS_BOOKING = 3_000;
+
+type Toast = { text: string; kind: "error" | "info" };
+
+/** A stable fingerprint of the visible bookings, so a poll only forces a
+ *  re-render (and a toast) when something actually changed. */
+function signatureOf(events: EventInput[]) {
+  return events
+    .map((e) => `${e.id}|${e.start}|${e.end}|${e.title}`)
+    .sort()
+    .join("\n");
 }
 
 type Dialog =
@@ -47,6 +61,7 @@ type Dialog =
       spaceName: string;
       bookedBy: string;
       mine: boolean;
+      canMove: boolean;
       canDelete: boolean;
     };
 
@@ -55,28 +70,49 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
   const spaceRef = useRef<string>("");
   const [activeSpace, setActiveSpace] = useState<string>("");
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  // Live-sync bookkeeping.
+  const lastSigRef = useRef<string | null>(null);
+  const mutatingRef = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4000);
+    const t = setTimeout(() => setToast(null), toast.kind === "info" ? 3000 : 4000);
     return () => clearTimeout(t);
   }, [toast]);
 
-  const refetch = useCallback(() => {
+  /** Re-pull events from the server and re-baseline the live-sync signature so
+   *  the next poll doesn't announce our own change as "Calendar updated". */
+  const refresh = useCallback(() => {
+    lastSigRef.current = null;
     calendarRef.current?.getApi().refetchEvents();
   }, []);
+
+  /** Run a server-action mutation with the poll paused, so a refetch can't land
+   *  mid-flight and fight an optimistic drag's revert(). */
+  const runMutation = useCallback(
+    async <T,>(fn: () => Promise<T>): Promise<T> => {
+      mutatingRef.current = true;
+      try {
+        return await fn();
+      } finally {
+        mutatingRef.current = false;
+      }
+    },
+    [],
+  );
 
   const selectSpace = useCallback(
     (slug: string) => {
       spaceRef.current = slug;
       setActiveSpace(slug);
-      refetch();
+      refresh();
     },
-    [refetch],
+    [refresh],
   );
 
   const fetchEvents = useCallback(
@@ -94,11 +130,64 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
         .then((r) =>
           r.ok ? r.json() : Promise.reject(new Error("Could not load bookings")),
         )
-        .then((data: EventInput[]) => success(data))
+        .then((data: EventInput[]) => {
+          lastSigRef.current = signatureOf(data);
+          success(data);
+        })
         .catch(failure);
     },
     [],
   );
+
+  // Live sync: poll the events endpoint and re-render when another client has
+  // created, moved or cancelled a booking. Also fires immediately when the tab
+  // regains focus (the "left it open for an hour" case).
+  useEffect(() => {
+    if (!mounted) return;
+
+    const poll = async () => {
+      if (document.hidden || mutatingRef.current) return;
+      const api = calendarRef.current?.getApi();
+      if (!api) return;
+
+      const params = new URLSearchParams({
+        start: api.view.activeStart.toISOString(),
+        end: api.view.activeEnd.toISOString(),
+      });
+      if (spaceRef.current) params.set("space", spaceRef.current);
+
+      try {
+        const r = await fetch(`/api/appointments?${params.toString()}`);
+        if (!r.ok) return;
+        const data: EventInput[] = await r.json();
+        const sig = signatureOf(data);
+        const known = lastSigRef.current;
+        lastSigRef.current = sig;
+        if (known !== null && sig !== known) {
+          api.refetchEvents();
+          setToast({ text: "Calendar updated", kind: "info" });
+        }
+      } catch {
+        // A dropped poll is harmless — the next one catches up.
+      }
+    };
+
+    const interval = setInterval(
+      poll,
+      dialog?.mode === "create" ? POLL_MS_BOOKING : POLL_MS,
+    );
+    const onFocus = () => {
+      if (!document.hidden) poll();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [mounted, dialog?.mode]);
 
   const handleSelect = useCallback((sel: DateSelectArg) => {
     setDialog({ mode: "create", start: sel.start, end: sel.end });
@@ -123,6 +212,7 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
       spaceName: e.extendedProps.spaceName,
       bookedBy: e.extendedProps.bookedBy,
       mine: Boolean(e.extendedProps.mine),
+      canMove: Boolean(e.extendedProps.canMove),
       canDelete: Boolean(e.extendedProps.canDelete),
     });
   }, []);
@@ -131,17 +221,22 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
     async (arg: EventChangeArg) => {
       const e = arg.event;
       if (!e.start || !e.end) return;
-      const res = await moveBooking({
-        id: e.id,
-        startISO: e.start.toISOString(),
-        endISO: e.end.toISOString(),
-      });
+      const res = await runMutation(() =>
+        moveBooking({
+          id: e.id,
+          startISO: e.start!.toISOString(),
+          endISO: e.end!.toISOString(),
+        }),
+      );
       if (!("ok" in res) || !res.ok) {
-        setToast(res.error);
+        setToast({ text: res.error, kind: "error" });
         arg.revert();
+      } else {
+        // Our own change — re-baseline so the poll stays quiet about it.
+        lastSigRef.current = null;
       }
     },
-    [],
+    [runMutation],
   );
 
   const renderEvent = useCallback((arg: EventContentArg) => {
@@ -196,13 +291,20 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
           </button>
         ))}
         <span className="ml-auto hidden text-xs text-neutral-500 sm:inline">
-          Drag an empty slot to book · pick one room or Day view for a clearer look
+          Drag an empty slot to book · click a booking to retime it
         </span>
       </div>
 
       {toast && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-          {toast}
+        <p
+          className={
+            "rounded-md px-3 py-2 text-sm " +
+            (toast.kind === "info"
+              ? "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+              : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300")
+          }
+        >
+          {toast.text}
         </p>
       )}
 
@@ -265,10 +367,12 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
           defaultSpaceSlug={activeSpace}
           start={dialog.start}
           end={dialog.end}
+          runMutation={runMutation}
           onClose={() => setDialog(null)}
+          onConflict={refresh}
           onDone={() => {
             setDialog(null);
-            refetch();
+            refresh();
           }}
         />
       )}
@@ -276,17 +380,25 @@ export function CalendarView({ spaces }: { spaces: SpaceOption[] }) {
       {dialog?.mode === "view" && (
         <EventDialog
           dialog={dialog}
+          runMutation={runMutation}
           onClose={() => setDialog(null)}
+          onConflict={refresh}
+          onSaved={() => {
+            setDialog(null);
+            refresh();
+          }}
           onCancelled={() => {
             setDialog(null);
-            refetch();
+            refresh();
           }}
-          onError={(m) => setToast(m)}
+          onError={(m) => setToast({ text: m, kind: "error" })}
         />
       )}
     </div>
   );
 }
+
+type RunMutation = <T>(fn: () => Promise<T>) => Promise<T>;
 
 function chipClass(active: boolean) {
   return (
@@ -347,22 +459,26 @@ function BookingDialog({
   defaultSpaceSlug,
   start,
   end,
+  runMutation,
   onClose,
+  onConflict,
   onDone,
 }: {
   spaces: SpaceOption[];
   defaultSpaceSlug: string;
   start: Date;
   end: Date;
+  runMutation: RunMutation;
   onClose: () => void;
+  onConflict: () => void;
   onDone: () => void;
 }) {
   const initialSpace =
     spaces.find((s) => s.slug === defaultSpaceSlug)?.id ?? spaces[0]?.id ?? "";
   const [spaceId, setSpaceId] = useState(initialSpace);
   const [title, setTitle] = useState("");
-  const [startStr, setStartStr] = useState(toLocalInput(start));
-  const [endStr, setEndStr] = useState(toLocalInput(end));
+  const [startStr, setStartStr] = useState(officeLocalInputValue(start));
+  const [endStr, setEndStr] = useState(officeLocalInputValue(end));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -370,15 +486,22 @@ function BookingDialog({
     e.preventDefault();
     setPending(true);
     setError(null);
-    const res = await createBooking({
-      spaceId,
-      title,
-      startISO: new Date(startStr).toISOString(),
-      endISO: new Date(endStr).toISOString(),
-    });
+    const res = await runMutation(() =>
+      createBooking({
+        spaceId,
+        title,
+        startISO: officeLocalToUtc(startStr).toISOString(),
+        endISO: officeLocalToUtc(endStr).toISOString(),
+      }),
+    );
     setPending(false);
-    if ("ok" in res && res.ok) onDone();
-    else setError((res as { error: string }).error);
+    if ("ok" in res && res.ok) {
+      onDone();
+    } else {
+      setError((res as { error: string }).error);
+      // Surface the booking that blocked us, behind the dialog.
+      onConflict();
+    }
   }
 
   return (
@@ -420,6 +543,7 @@ function BookingDialog({
             <span className="text-sm font-medium">Start</span>
             <input
               type="datetime-local"
+              step={60}
               value={startStr}
               onChange={(e) => setStartStr(e.target.value)}
               required
@@ -430,6 +554,7 @@ function BookingDialog({
             <span className="text-sm font-medium">End</span>
             <input
               type="datetime-local"
+              step={60}
               value={endStr}
               onChange={(e) => setEndStr(e.target.value)}
               required
@@ -460,29 +585,50 @@ function BookingDialog({
 
 function EventDialog({
   dialog,
+  runMutation,
   onClose,
+  onConflict,
+  onSaved,
   onCancelled,
   onError,
 }: {
   dialog: Extract<Dialog, { mode: "view" }>;
+  runMutation: RunMutation;
   onClose: () => void;
+  onConflict: () => void;
+  onSaved: () => void;
   onCancelled: () => void;
   onError: (message: string) => void;
 }) {
   const [pending, setPending] = useState(false);
-  const fmt = (d: Date) =>
-    d.toLocaleString(undefined, {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+  const [startStr, setStartStr] = useState(officeLocalInputValue(dialog.start));
+  const [endStr, setEndStr] = useState(officeLocalInputValue(dialog.end));
+  const [savingTime, setSavingTime] = useState(false);
+  const [timeError, setTimeError] = useState<string | null>(null);
+
+  async function saveTime(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingTime(true);
+    setTimeError(null);
+    const res = await runMutation(() =>
+      moveBooking({
+        id: dialog.id,
+        startISO: officeLocalToUtc(startStr).toISOString(),
+        endISO: officeLocalToUtc(endStr).toISOString(),
+      }),
+    );
+    setSavingTime(false);
+    if ("ok" in res && res.ok) {
+      onSaved();
+    } else {
+      setTimeError((res as { error: string }).error);
+      onConflict();
+    }
+  }
 
   async function remove() {
     setPending(true);
-    const res = await cancelBooking(dialog.id);
+    const res = await runMutation(() => cancelBooking(dialog.id));
     setPending(false);
     if ("ok" in res && res.ok) onCancelled();
     else onError((res as { error: string }).error);
@@ -498,7 +644,7 @@ function EventDialog({
         <div className="flex gap-2">
           <dt className="w-20 shrink-0 text-neutral-500">When</dt>
           <dd>
-            {fmt(dialog.start)} – {fmt(dialog.end)}
+            {formatOffice(dialog.start)} – {formatOffice(dialog.end)}
           </dd>
         </div>
         <div className="flex gap-2">
@@ -506,6 +652,49 @@ function EventDialog({
           <dd>{dialog.bookedBy}</dd>
         </div>
       </dl>
+
+      {dialog.canMove && (
+        <form onSubmit={saveTime} className="mt-4 space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+          {timeError && (
+            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+              {timeError}
+            </p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Start</span>
+              <input
+                type="datetime-local"
+                step={60}
+                value={startStr}
+                onChange={(e) => setStartStr(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">End</span>
+              <input
+                type="datetime-local"
+                step={60}
+                value={endStr}
+                onChange={(e) => setEndStr(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </label>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={savingTime}
+              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+            >
+              {savingTime ? "Saving…" : "Save time"}
+            </button>
+          </div>
+        </form>
+      )}
 
       {!dialog.mine && (
         <p className="mt-4 rounded-md bg-neutral-50 px-3 py-2 text-xs text-neutral-500 dark:bg-neutral-800/60">
