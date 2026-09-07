@@ -60,53 +60,57 @@ async function assertFreeSlot(
 type UtcSlot = { startsAt: Date; endsAt: Date };
 
 /**
- * Materialise a series inside an open transaction. Occurrences that clash with an
- * existing booking are skipped (and reported); occurrence N is checked against
- * occurrences 1..N-1 written earlier in this same transaction. Throws
- * "ALL_CLASH" (rolling the transaction back) if nothing could be created.
+ * Materialise a recurring series. The occurrences of one WEEKLY/MONTHLY series
+ * never overlap each other (distinct days), so each slot is checked once against
+ * the already-committed bookings *outside* any transaction — keeping the
+ * transaction itself down to two statements regardless of series length. The
+ * `appointment_no_overlap` exclusion constraint is still the backstop for the
+ * rare race between the check and the insert.
+ *
+ * Clashing occurrences are skipped and reported. Throws "ALL_CLASH" if none fit.
  */
-async function insertSeries(
-  tx: Prisma.TransactionClient,
-  opts: {
-    userId: string;
-    spaceId: string;
-    title: string;
-    frequency: Frequency;
-    slots: UtcSlot[];
-  },
-): Promise<{ made: number; skipped: Date[] }> {
-  const series = await tx.appointmentSeries.create({
-    data: { userId: opts.userId, frequency: opts.frequency },
-  });
-
+async function insertSeries(opts: {
+  userId: string;
+  spaceId: string;
+  title: string;
+  frequency: Frequency;
+  slots: UtcSlot[];
+}): Promise<{ made: number; skipped: Date[] }> {
+  const free: UtcSlot[] = [];
   const skipped: Date[] = [];
-  let made = 0;
 
   for (const slot of opts.slots) {
-    try {
-      await assertFreeSlot(tx, opts.spaceId, slot.startsAt, slot.endsAt);
-    } catch (e) {
-      if (e instanceof Error && e.message === "OVERLAP") {
-        skipped.push(slot.startsAt);
-        continue;
-      }
-      throw e;
-    }
-    await tx.appointment.create({
-      data: {
+    const clash = await prisma.appointment.findFirst({
+      where: {
+        spaceId: opts.spaceId,
+        startsAt: { lt: slot.endsAt },
+        endsAt: { gt: slot.startsAt },
+      },
+      select: { id: true },
+    });
+    if (clash) skipped.push(slot.startsAt);
+    else free.push(slot);
+  }
+
+  if (free.length === 0) throw new Error("ALL_CLASH");
+
+  await prisma.$transaction(async (tx) => {
+    const series = await tx.appointmentSeries.create({
+      data: { userId: opts.userId, frequency: opts.frequency },
+    });
+    await tx.appointment.createMany({
+      data: free.map((slot) => ({
         spaceId: opts.spaceId,
         userId: opts.userId,
         title: opts.title,
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
         seriesId: series.id,
-      },
+      })),
     });
-    made++;
-  }
+  });
 
-  if (made === 0) throw new Error("ALL_CLASH");
-  return { made, skipped };
+  return { made: free.length, skipped };
 }
 
 export async function createAppointment(
@@ -163,9 +167,13 @@ export async function createAppointment(
     let made: number;
     let skippedCount: number;
     try {
-      const r = await prisma.$transaction((tx) =>
-        insertSeries(tx, { userId: user.id, spaceId, title, frequency, slots }),
-      );
+      const r = await insertSeries({
+        userId: user.id,
+        spaceId,
+        title,
+        frequency,
+        slots,
+      });
       made = r.made;
       skippedCount = r.skipped.length;
     } catch (err) {
@@ -261,15 +269,13 @@ export async function createBooking(input: {
     }));
 
     try {
-      const { made, skipped } = await prisma.$transaction((tx) =>
-        insertSeries(tx, {
-          userId: user.id,
-          spaceId: input.spaceId,
-          title,
-          frequency: input.frequency!,
-          slots,
-        }),
-      );
+      const { made, skipped } = await insertSeries({
+        userId: user.id,
+        spaceId: input.spaceId,
+        title,
+        frequency: input.frequency!,
+        slots,
+      });
       revalidatePath("/calendar");
       revalidatePath("/appointments");
       return { ok: true, made, skipped: skipped.length };
@@ -315,6 +321,7 @@ async function moveSeries(
   const occurrences = await prisma.appointment.findMany({
     where: { seriesId },
     select: { id: true, startsAt: true },
+    orderBy: { startsAt: "asc" },
   });
   if (occurrences.length === 0) return { error: "Esa serie ya no existe." };
 
@@ -327,20 +334,22 @@ async function moveSeries(
     return { id: occ.id, startsAt, endsAt: new Date(startsAt.getTime() + durationMs) };
   });
 
-  // Pre-check every occurrence against committed bookings that aren't this series.
-  const conflicts: Date[] = [];
-  for (const m of moves) {
-    const clash = await prisma.appointment.findFirst({
-      where: {
-        spaceId,
-        id: { notIn: ids },
-        startsAt: { lt: m.endsAt },
-        endsAt: { gt: m.startsAt },
-      },
-      select: { id: true },
-    });
-    if (clash) conflicts.push(m.startsAt);
-  }
+  // One query: any booking in this room (outside the series) overlapping any of
+  // the new slots. Then match each hit back to the slot(s) it blocks.
+  const others = await prisma.appointment.findMany({
+    where: {
+      spaceId,
+      id: { notIn: ids },
+      startsAt: { lt: moves[moves.length - 1].endsAt },
+      endsAt: { gt: moves[0].startsAt },
+    },
+    select: { startsAt: true, endsAt: true },
+  });
+  const conflicts = moves
+    .filter((m) =>
+      others.some((o) => o.startsAt < m.endsAt && o.endsAt > m.startsAt),
+    )
+    .map((m) => m.startsAt);
   if (conflicts.length > 0) {
     return {
       error: `No se pudo mover la serie: ${spaceName} está ocupado el ${listDates(conflicts)}.`,
@@ -349,12 +358,15 @@ async function moveSeries(
 
   try {
     await prisma.$transaction(
-      moves.map((m) =>
-        prisma.appointment.update({
-          where: { id: m.id },
-          data: { startsAt: m.startsAt, endsAt: m.endsAt },
-        }),
-      ),
+      async (tx) => {
+        for (const m of moves) {
+          await tx.appointment.update({
+            where: { id: m.id },
+            data: { startsAt: m.startsAt, endsAt: m.endsAt },
+          });
+        }
+      },
+      { timeout: 20_000 },
     );
   } catch (err) {
     if (isOverlapError(err)) {
